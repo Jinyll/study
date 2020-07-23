@@ -125,8 +125,68 @@ inode固定128bytes，数据块block为1/2/4K，一般超级块1024bytes。
 软连接（符号连接）：创建独立文件，这个文件会将数据读写指向它连接的那个文件的文件名，源文件删除后，符号连接会开不了。占用inode和block。
 12、磁盘分区-》格式化来创建文件系统-》挂载到某个目录。
 
-第
-12、磁盘分区-》格式化来创建文件系统-》挂载到某个目录。
+第9章 文件与文件系统的压缩与打包
+
+第11章 认识与学习shell
+内核在内存中受保护的块，使用shell将输入的命令与kernel通信，让kernel可以控制硬件来正确无误的工作。
+1、命令运行顺序：以相对/绝对路径执行，由alias找到命令执行，由bash内置builtin命令执行，通过$PATH找到第一个命令执行。
+2、login shell只会读取两个配置文件：/etc/profile（系统整体设置）和～/.bash_profile或~/.bash_login或~/.profile（个人设置，只读取一个）。
+3、stty设置终端机tty的输入按键含义。
+4、stdin标准输入是0，stdout标准输出是1，stderr标准错误输出是2。1/2>和1/2>>中间没有空格。
+将stdout和stderr分别输出到不同文件：ls > list1 2> list2；输入到同一文件：ls > list 2>$1或者ls $> list。错误写法:ls > list 2> list。（输出次序错乱）。
+5、/dev/null垃圾桶黑洞设备。
+6、命令执行的判断依据；  &&  ||
+7、管道命令只能处理前一个命令的正确信息，即stdout，而不能处理stderr。管道命令必须能够接受stdin，如ls不是管道命令。
+8、cut同行数据以某个字符分割，取得数据，但在处理多空个相连数据不大好。
+grep分析一行信息，如果有所需信息，则拿出。
+sort可分割后依据不同数据类型排序。
+uniq重复数据列出一个。wc多少字行字符统计。
+tee双向重定向？
+tr [-dr]删除或者替换信息。（DOS后自动加^M也就是\r来断行）
+col [-xb]将tab转为空格，若有/则保留/后的字符。（将man page转为纯文本方便查阅）
+join [-ti12] file1 file2 两个文件中相同字段连起来(使用前先排序，否则有些对比项目会被略过）
+paste [-d]- file1 file2 直接将两行贴在一期，中间tab分割。-表示stdin（貌似还可以当作stdout，反正就是需要用文件而没有文件（管道后？
+expand [-t] file将tab转为空格。unexpand将空白转为tab命令。
+split [-bl] file PREFIX 大文件切割为以PREFIX为前导符的小文件。cat xxx* >> xxx还可以合成一个文件。
+xargs产生某个命令的参数。读入stdin，以空格或断行字符进行分辨，将stdin的数据分割称arguments。（很多命令不支持管道，所以用xargs提供命令引用stdin。如ls不是管道命令 xx命令输出 ｜ xargs ls -l显示
+9、合法shell在/etc/shells文件中
+用户默认登录取得shell在/etc/passwd最后一个字段
+使用env或export查看环境变量，se查看目前bash环境下所有变量。
+$?是变量，表示前一个命令执行完毕的回传码，为0表示成功。
+
+第13章 学习shell script
+1、shell script程序化脚本，利用shell功能写的程序，使用纯文本文件，shell语法和命令写在里面，搭配正则/管道/数据流重定向等功能。
+2、test测试文件类型，权限，文件之间比较，整数判定，字符串判定，多重条件判定。中括号[]也可以坐判断符号，多用于if then fi的情况。
+3、shell script的默认变量。$0 $@等。
+4、对谈式脚本用read命令达成。
+5、script用source执行，代表在父进程执行。
+
+第20章 启动流程、模块管理与Loader
+1、系统启动过程
+(1)加载BIOS的硬件信息（bios加载cmod信息，通过cmos设置值取得主机各项硬件配置，如cpu和接口频率，启动设备查找顺序）与进行自我测试（开机自检POST），并依据设置取得第一个可启动设备；
+(2)读取并执行第一个启动设备内MBR的boot loader（即是grub，spfdisk等程序）；（不同操作系统文件格式不同，需要引导装载程序处理内核文件加载）
+(3)依据引导装载程序boot loader（装载程序安装在启动设备的第一个扇区，就是主引导分区MBR）的设置加载kernel，kernel会开始检测硬件和加载驱动程序；
+（内核文件由loader读取，每个操作系统loader不同，bios如何读取mbr中的loader？bios是通过硬件INT 13中断读取MBR，只要bios能够检测到磁盘，就有办法通过int13信道读取磁盘第一个扇区的mbr，执行loader。
+(4)在硬件驱动成功后，kernel会主动调用init进程，而init会取得run-level的信息；
+(5)init执行/etc/rc.d/rc.sysinit文件来准备软件执行的操作环境（网络，时区等；
+(6)init执行run-level的各个服务的启动（script方式；
+(7)init执行/etc/rc.d/rc.local文件；
+(8)init执行终端机模拟程序mingetty来启动login进程，最后就等待用户登录。
+
+2、boot loader的功能
+认识操作系统文件格式，并据此加载内核到内存中执行。而操作系统文件格式不一致，因此每种os都有自己的boot loader，用自己的loader才可以载入内核文件。
+问题：mbr只有一个，如何执行对应boot sectore里面的loader，怎么安装多系统？
+解答：每个文件系统保留一块引导扇区boot sector提供操作系统安装boot loader，而通常os都默认安装一份loader到根目录所在的文件系统的boot sector上。
+linux中可以选择是否安装到mbr，如果选择安装到mbr，则mbr和boot sector都保有一份boot loader程序；至于win安装，默认主动将mbr和boot sector装一份boot loader。因此多重系统mbr常被覆盖。
+由于boot loader主要功能有：提供菜单，加载内核文件，转交其他loader。因此通过菜单可以选择不同内核，控制权转交也可交给其他boot sector的loader，不过win的loader默认不具有控制权转交，因此不能win的loader加载linux的loader。
+
+
+
+
+
+
+
+
 
 
 
