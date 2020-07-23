@@ -180,6 +180,59 @@ $?是变量，表示前一个命令执行完毕的回传码，为0表示成功�
 linux中可以选择是否安装到mbr，如果选择安装到mbr，则mbr和boot sector都保有一份boot loader程序；至于win安装，默认主动将mbr和boot sector装一份boot loader。因此多重系统mbr常被覆盖。
 由于boot loader主要功能有：提供菜单，加载内核文件，转交其他loader。因此通过菜单可以选择不同内核，控制权转交也可交给其他boot sector的loader，不过win的loader默认不具有控制权转交，因此不能win的loader加载linux的loader。
 
+3、加载内核检测硬件与initrd的功能
+通过boot loader的管理开始读取内核文件后，linux内核会以自己的功能重新检测一下硬件，而不一定使用bios检测到的硬件信息，即内核此时开始接管bios后的工作。
+内核模块放在/lib/modules/目录内，此为磁盘根目录，因此启动过程中内核必须要挂载根目录，这样才能够读取内核模块提供加载驱动程序的功能。并且为了不影响磁盘内文件，启动过程中根目录以只读方式挂载。
+问题：若linux安装在sata磁盘，可以通过bios的int 13取得boot loader与kernel文件启动，然后kernel开始接管系统并检测硬件，尝试挂载根目录取得额外驱动，
+但是内核不认识sata磁盘，所以需要sata磁盘的驱动程序，否则无法挂载根目录，但是sata磁盘的驱动在/lib/modules内，若根本无法挂载根目录，则无法读取/lib/modules内的驱动，进入两难？
+解答：使用虚拟文件系统InitialRAM Disk，文件名/boot/initrd。特点：也能够通过boot loader加载到内存，然后解压缩在内存中仿真成一个根目录，此仿真在内存当中的文件系统能够提供一个可执行程序，
+通过该程序来加载启动过程中所最需要的内核模块，通常这些模块就是usb，raid，lvm，scsi等文件系统与磁盘接口的驱动程序。载入完成后，释放虚拟文件系统，挂载实际根目录，会帮助内核重新调用/sbin/init开始后续启动流程。
+注意：不一定需要initrd，因其是为了在启动时无法挂载根目录的情况下，如根目录在特殊的磁盘接口usb，sta，scsi中，或者文件系统较为特殊lvm，raid等，才会需要initrd。
+如果linux是安装在ide接口的磁盘，并且使用默认的ext2/ext3文件系统，那么不需要也可以。
+
+4、第一个进程init及配置文件/etc/inittab与runlevel
+内核完整加载后，主机开始运行，内核主动调用系统的第一个程序：/sbin/init/。init的pid是1号。主要功能是准备软件执行环境，包括主机名，网络设置，语系处理，文件系统格式，其他服务的启动等。
+所有操作通过init配置文件/etc/inittab规划，而其中还有一个很重要的设置选项，即默认的run level启动执行等级，包含启动服务的script放置路径。
+run level执行等级有7个。0关机；1单用户维护模式用在系统出问题；2类似3，无nfs服务；3完整含有网络功能的纯文本模式；4系统保留功能；5x11与3类似，但加载x window；6重启。不能默认046。
+
+5、init处理系统初始化流程（/etc/rc.d/rc/sysinit）
+加载系统服务之前，要设置系统环境，通过/etc/rc.d/rc/sysinit这个shell script来设置系统环境。
+工作有：取得网络环境和主机类型、测试与挂载内存设备/proc和usb设备/sys、是否启动selinux、用户自定义模块的加载、内核相关配置、重新以可读写模式挂载系统磁盘、清除启动过程中的临时文件、启动信息放dmesg。
+
+6、启动系统服务与相关启动配置文件（/etc/rc.d/rc N & //etc/sysconfig）
+7、用户自定义开机启动项（/etc/rc.d/rc/local）
+8、内核模块的加载与删除
+modprobe会查找modules.dep的内容，克服模块依赖性后，决定需要加载的模块；modprobe -r删除。insmod完全由用户自行加载一个完整文件名的模块，并不会主动分析模块依赖性；rmmod删除。
+
+9、boot loader：grub
+（1）bios读完信息，会到第一个启动设备的mbr去读取boot loader，这个loader具有菜单、直接加载内核文件、控制权转移功能。但mbr是硬盘第一个sector内一个块，大小446bytes，而loader不止这么大。
+所以loader程序代码执行和设置值分为两个阶段：1执行loader主程序；2主程序加载配置文件/boot/grub/menu.list。（包括文件系统定义与主要配置文件menu.list）。
+（2）grub对硬盘的代号与传统linux磁盘代号不同。第一块硬盘mbr安装处硬盘代号是（hd0），第一块硬盘的第一个分区的boot sector是（hd0，0），第一块硬盘的第一个逻辑分区的boot sector是（hd0，4）
+
+10、init配置文件错误
+可以直接在启动进入grub后，在grub edit设置init/bin=bash，指定内核调用的第一个进程init变成/bin/bash，但根据启动流程而言，此时除了根目录外，其他目录都没有被挂载，根目录为只读，
+所以需要把根目录重新挂载为读写，再重挂载。
+
+第22章 软件安装：源码与Tarball
+第23章 软件安装：RPM、SRPM、YUM功能
+1、redhat/fedora/centos 使用RPM的软件管理机制，在线升级是yum；debian/ubuntu使用DPKG，在线升级是apt-get。
+2、rpm中包含已经编译的软件，数据库记录了软件要安装时候必须具备的依赖属性软件，若满足则安装，否则不安装。该软件文件几乎只能在原本默认的硬件与操作系统版本运行（因已经编译）；
+srpm这个rpm文件里面包含源代码，提供的软件内容并没有经过编译。与tarball的区别是含有该软件所需要的依赖性软件说明及rpm文件所提供的数据。与rpm的不同是提供了参数设置文件configure和makefile，
+若要安装需要通过rpm方式编译再安装到linux系统中。
+
+第26章 Linux内核编译与管理
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
